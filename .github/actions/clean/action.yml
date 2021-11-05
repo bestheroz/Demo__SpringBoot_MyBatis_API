@@ -1,0 +1,12 @@
+name: 'Clean'
+description: 'Clean the previous build'
+
+runs:
+  using: 'composite'
+  steps:
+    - run: |
+        echo "clean src/main/resources/static"
+        rm -rf src/main/resources/static
+        echo "clean vue/dist"
+        rm -rf vue/dist
+      shell: bash

@@ -1,0 +1,49 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main, RC/** ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ${{ matrix.os }}
+    env:
+      CI: true
+
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        node-version: [ 14 ]
+        java-version: [ 17 ]
+
+    steps:
+      - uses: actions/checkout@main
+
+      - uses: ./.github/actions/clean
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@main
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: vue/package-lock.json
+
+      - name: npm install
+        run: |
+          cd vue
+          npm ci
+        env:
+          CI: true
+
+      - uses: ./.github/actions/test
+
+      - uses: ./.github/actions/build-node
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@main
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java-version }}
+          cache: 'gradle'
+
+      - uses: ./.github/actions/build-gradle

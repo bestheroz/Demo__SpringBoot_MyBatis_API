@@ -1,0 +1,34 @@
+name: Test
+
+on:
+  push:
+    branches-ignore: [ main, RC/** ]
+
+jobs:
+  npm-test:
+    name: npm install & lint
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        node-version: [ 14 ]
+
+    steps:
+      - uses: actions/checkout@main
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@main
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: vue/package-lock.json
+
+      - name: npm install
+        run: |
+          cd vue
+          npm ci
+        env:
+          CI: true
+
+      - uses: ./.github/actions/test
