@@ -206,7 +206,8 @@ public class TestCreateTableEntity {
             this.javaFilePath
                 + this.javaPackageEndPoint.replaceAll("\\.", "/")
                 + "/"
-                + entityName+"Repository"
+                + entityName
+                + "Repository"
                 + ".java");
     Files.write(
         javaRepositoryFilePath,
