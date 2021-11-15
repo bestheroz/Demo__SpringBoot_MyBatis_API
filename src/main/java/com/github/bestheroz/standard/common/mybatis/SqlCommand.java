@@ -25,12 +25,11 @@ import org.springframework.lang.NonNull;
 
 @Slf4j
 public class SqlCommand {
-  public static final String SELECT_ITEMS_BY_MAP_WITH_ORDER = "getItemsByMapWithOrder";
-  public static final String SELECT_TARGET_ITEMS_BY_MAP_WITH_ORDER = "getTargetItemsByMapWithOrder";
-  public static final String SELECT_ITEMS_BY_DATATABLE = "getItemsForDataTable";
+  public static final String SELECT_ITEMS = "getDistinctAndTargetItemsByMapOrderBy";
   public static final String SELECT_ITEM_BY_MAP = "getItemByMap";
-  public static final String COUNT_BY_DATATABLE = "countForDataTable";
   public static final String COUNT_BY_MAP = "countByMap";
+  public static final String SELECT_ITEMS_BY_DATATABLE = "getItemsForDataTable";
+  public static final String COUNT_BY_DATATABLE = "countForDataTable";
   public static final String INSERT = "insert";
   public static final String INSERT_BATCH = "insertBatch";
   public static final String UPDATE_MAP_BY_MAP = "updateMapByMap";
@@ -49,8 +48,7 @@ public class SqlCommand {
       Set.of("SERIAL_VERSION_U_I_D", "serialVersionUID", "E_N_C_R_Y_P_T_E_D__C_O_L_U_M_N__L_I_S_T");
   private static final Set<String> METHOD_LIST =
       Set.of(
-          SELECT_ITEMS_BY_MAP_WITH_ORDER,
-          SELECT_TARGET_ITEMS_BY_MAP_WITH_ORDER,
+          SELECT_ITEMS,
           SELECT_ITEMS_BY_DATATABLE,
           SELECT_ITEM_BY_MAP,
           COUNT_BY_MAP,
@@ -100,10 +98,10 @@ public class SqlCommand {
                     return (METHOD_LIST.contains(item.getMethodName())
                         && Class.forName(item.getClassName()).getInterfaces().length > 0
                         && Class.forName(item.getClassName())
-                                .getInterfaces()[0]
-                                .getGenericInterfaces()
-                                .length
-                            > 0);
+                        .getInterfaces()[0]
+                        .getGenericInterfaces()
+                        .length
+                        > 0);
                   } catch (final ClassNotFoundException e) {
                     log.warn("Failed to getEntityClass");
                     throw BusinessException.ERROR_SYSTEM;
@@ -124,23 +122,6 @@ public class SqlCommand {
       log.warn("Failed to getEntityClass");
       throw BusinessException.ERROR_SYSTEM;
     }
-  }
-
-  public String getItemsByMapWithOrder(
-      final Map<String, Object> whereConditions, final List<String> orderByConditions) {
-    return this.select(whereConditions, orderByConditions);
-  }
-
-  public String getTargetItemsByMapWithOrder(
-      final Set<String> targetColumns,
-      final Map<String, Object> whereConditions,
-      final List<String> orderByConditions) {
-    return this.select(targetColumns, whereConditions, orderByConditions);
-  }
-
-  private String select(
-      final Map<String, Object> whereConditions, final List<String> orderByConditions) {
-    return this.select(this.getEntityFields(), whereConditions, orderByConditions);
   }
 
   // ordered list required
@@ -164,22 +145,39 @@ public class SqlCommand {
         .collect(Collectors.toSet());
   }
 
-  private String select(
+  public String getDistinctAndTargetItemsByMapOrderBy(
+      final Set<String> distinctColumns,
       final Set<String> targetColumns,
       final Map<String, Object> whereConditions,
       final List<String> orderByConditions) {
     final SQL sql = new SQL();
-    this.getSelectSql(sql, targetColumns);
+    if (distinctColumns.isEmpty() && targetColumns.isEmpty()) {
+      for (final String targetColumn : this.getEntityFields()) {
+        sql.SELECT(CaseUtils.getCamelCaseToSnakeCase(targetColumn));
+      }
+    } else {
+      for (final String distinctColumn : distinctColumns) {
+        sql.SELECT_DISTINCT(CaseUtils.getCamelCaseToSnakeCase(distinctColumn));
+      }
+      for (final String targetColumn : targetColumns) {
+        if (!distinctColumns.contains(targetColumn)) {
+          sql.SELECT(CaseUtils.getCamelCaseToSnakeCase(targetColumn));
+        }
+      }
+    }
     sql.FROM(this.getTableName());
     this.getWhereSql(sql, whereConditions);
-    orderByConditions.forEach(columns -> sql.ORDER_BY(CaseUtils.getCamelCaseToSnakeCase(columns)));
+    for (final String orderByCondition : orderByConditions) {
+      sql.ORDER_BY(CaseUtils.getCamelCaseToSnakeCase(orderByCondition));
+    }
     log.debug(sql.toString());
     return sql.toString();
   }
 
-  public String getItemByMap(@NonNull final Map<String, Object> whereConditions) {
+  public String getItemByMap(final Map<String, Object> whereConditions) {
     this.verifyWhereKey(whereConditions);
-    return this.select(whereConditions, List.of());
+    return this.getDistinctAndTargetItemsByMapOrderBy(
+        Set.of(), Set.of(), whereConditions, List.of());
   }
 
   public <T> String insert(@NonNull final T entity) {
@@ -375,7 +373,7 @@ public class SqlCommand {
                         sql.ORDER_BY(
                             columns.startsWith("-")
                                 ? CaseUtils.getCamelCaseToSnakeCase(columns.replaceFirst("-", ""))
-                                    + " DESC"
+                                + " DESC"
                                 : CaseUtils.getCamelCaseToSnakeCase(columns) + " ASC")));
     if (dataTableFilterDTO.getPage() != 0) {
       sql.LIMIT(dataTableFilterDTO.getItemsPerPage());
@@ -401,17 +399,17 @@ public class SqlCommand {
       case "ne":
         return MessageFormat.format("{0} <> {1}", dbColumnName, this.getFormattedValue(value));
       case "in":
-        {
-          final Set<?> values = (Set<?>) value;
-          if (values.isEmpty()) {
-            log.warn("WHERE - empty in cause : {}", dbColumnName);
-            throw new BusinessException(ExceptionCode.FAIL_NO_DATA_SUCCESS);
-          }
-          return MessageFormat.format(
-              "{0} IN ({1})",
-              dbColumnName,
-              values.stream().map(this::getFormattedValue).collect(Collectors.joining(",")));
+      {
+        final Set<?> values = (Set<?>) value;
+        if (values.isEmpty()) {
+          log.warn("WHERE - empty in cause : {}", dbColumnName);
+          throw new BusinessException(ExceptionCode.FAIL_NO_DATA_SUCCESS);
         }
+        return MessageFormat.format(
+            "{0} IN ({1})",
+            dbColumnName,
+            values.stream().map(this::getFormattedValue).collect(Collectors.joining(",")));
+      }
       case "notIn":
         final Set<?> values = (Set<?>) value;
         if (values.isEmpty()) {
@@ -470,7 +468,7 @@ public class SqlCommand {
       return "'" + MapperUtils.toJsonArray(value).toString() + "'";
     } else if (value instanceof Instant instant) {
       return "'" + DateUtils.toString(instant, "yyyy-MM-dd HH:mm:ss.SSS") + "'";
-      //       MYSQL
+      //      MYSQL
       //      return MessageFormat.format(
       //          "FROM_UNIXTIME({0,number,#})",
       //          Integer.parseInt(String.valueOf((instant).toEpochMilli() / 1000)));

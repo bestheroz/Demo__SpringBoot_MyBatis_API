@@ -32,9 +32,8 @@ public class ExternalCodeController {
   @GetMapping("types/")
   ResponseEntity<ApiResult<List<String>>> getTypes() {
     return Result.ok(
-        this.codeRepository.getTargetItemsWithOrder(Set.of("type"), List.of("type")).stream()
+        this.codeRepository.getDistinctItemsOrderBy(Set.of("type"), List.of("type")).stream()
             .map(Code::getType)
-            .distinct()
             .toList());
   }
 
@@ -45,7 +44,7 @@ public class ExternalCodeController {
           final String type) {
     return Result.ok(
         this.codeRepository
-            .getItemsByMapWithOrder(Map.of("type", type), List.of("displayOrder"))
+            .getItemsByMapOrderBy(Map.of("type", type), List.of("displayOrder"))
             .stream()
             .map(c -> new CodeVO<>(c.getValue(), c.getText()))
             .toList());
