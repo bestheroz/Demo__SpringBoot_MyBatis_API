@@ -98,10 +98,10 @@ public class SqlCommand {
                     return (METHOD_LIST.contains(item.getMethodName())
                         && Class.forName(item.getClassName()).getInterfaces().length > 0
                         && Class.forName(item.getClassName())
-                        .getInterfaces()[0]
-                        .getGenericInterfaces()
-                        .length
-                        > 0);
+                                .getInterfaces()[0]
+                                .getGenericInterfaces()
+                                .length
+                            > 0);
                   } catch (final ClassNotFoundException e) {
                     log.warn("Failed to getEntityClass");
                     throw BusinessException.ERROR_SYSTEM;
@@ -373,7 +373,7 @@ public class SqlCommand {
                         sql.ORDER_BY(
                             columns.startsWith("-")
                                 ? CaseUtils.getCamelCaseToSnakeCase(columns.replaceFirst("-", ""))
-                                + " DESC"
+                                    + " DESC"
                                 : CaseUtils.getCamelCaseToSnakeCase(columns) + " ASC")));
     if (dataTableFilterDTO.getPage() != 0) {
       sql.LIMIT(dataTableFilterDTO.getItemsPerPage());
@@ -399,17 +399,17 @@ public class SqlCommand {
       case "ne":
         return MessageFormat.format("{0} <> {1}", dbColumnName, this.getFormattedValue(value));
       case "in":
-      {
-        final Set<?> values = (Set<?>) value;
-        if (values.isEmpty()) {
-          log.warn("WHERE - empty in cause : {}", dbColumnName);
-          throw new BusinessException(ExceptionCode.FAIL_NO_DATA_SUCCESS);
+        {
+          final Set<?> values = (Set<?>) value;
+          if (values.isEmpty()) {
+            log.warn("WHERE - empty in cause : {}", dbColumnName);
+            throw new BusinessException(ExceptionCode.FAIL_NO_DATA_SUCCESS);
+          }
+          return MessageFormat.format(
+              "{0} IN ({1})",
+              dbColumnName,
+              values.stream().map(this::getFormattedValue).collect(Collectors.joining(",")));
         }
-        return MessageFormat.format(
-            "{0} IN ({1})",
-            dbColumnName,
-            values.stream().map(this::getFormattedValue).collect(Collectors.joining(",")));
-      }
       case "notIn":
         final Set<?> values = (Set<?>) value;
         if (values.isEmpty()) {
